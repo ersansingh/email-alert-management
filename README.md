@@ -1,6 +1,6 @@
 # Email Alert Management System
 
-This system uses a multi-agent architecture with LangGraph to process and remediate email alerts.
+This system uses a multi-agent architecture orchestrated by **n8n** to process and remediate email alerts.
 
 ## Getting Started
 
@@ -31,18 +31,19 @@ docker-compose -f docker-compose.local.yml up --build
 
 ### 3. Service Access
 Once running, you can access the following services:
-- **FastAPI Application:** `http://localhost:8000` (Endpoint: `POST /alert`)
+- **FastAPI Application:** `http://localhost:8000` (Individual Agent Endpoints)
+- **n8n (Orchestration):** `http://localhost:5678`
 - **Prometheus (Metrics):** `http://localhost:9090`
 - **Grafana (Dashboards):** `http://localhost:3000` (Default: admin/admin)
 - **Jaeger (Tracing):** `http://localhost:16686`
 - **LocalStack (Cloud Mocks):** `http://localhost:4566`
 - **Mock LLM:** `http://localhost:5000`
 
-### 4. Running Integration Tests
-To run tests against the LocalStack instance programmatically:
-```bash
-pytest tests/test_integration_localstack.py
-```
+### 5. n8n Workflow Setup
+1. Open n8n at `http://localhost:5678`.
+2. Import the `n8n_workflow.json` file from the root directory.
+3. Activate the workflow.
+4. Send a test alert to the Webhook URL (visible in the Webhook node).
 
 ---
 
@@ -53,15 +54,14 @@ The project uses GitHub Actions to automate the entire lifecycle from code commi
 ### 1. Continuous Integration (CI) - `.github/workflows/ci.yml`
 Triggered on: **Push to any branch** and **Pull Requests**.
 - **Linting:** Checks code style using `flake8`.
-- **Unit Testing:** Executes tests in `tests/` using `pytest` to ensure logic correctness.
-- **Verification:** Ensures the application can build and dependencies are resolved.
+- **Unit Testing:** Executes tests in `tests/` using `pytest`.
+- **Verification:** Ensures the application and agent services are functional.
 
 ### 2. Continuous Deployment (CD) - `.github/workflows/deploy.yml`
 Triggered on: **Merge/Push to `main`**.
 - **Multi-Cloud Infrastructure:** Uses Terraform to provision resources.
-- **Provider Selection:** Supports both **AWS** and **GCP** via the `cloud_provider` variable.
-- **Manual Trigger:** Can be manually triggered via `workflow_dispatch` to choose a specific cloud provider.
-- **Security:** Injects `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `GOOGLE_CREDENTIALS` from GitHub Secrets.
+- **n8n Hosting:** Deploys n8n as the central orchestrator (containerized on ECS/GKE).
+- **Provider Selection:** Supports both **AWS** and **GCP**.
 
 ---
 
@@ -70,9 +70,9 @@ Triggered on: **Merge/Push to `main`**.
 This section outlines the architectural standards and conventions.
 
 ## Architectural Guidelines
-- **Agent-Oriented:** Multi-agent approach orchestrated via `LangGraph`. Each agent is a discrete module in `app/agents/`.
-- **State Management:** Strict use of `Pydantic` `BaseModel` (`AlertState`) for workflow states.
-- **Multi-Cloud:** Infrastructure is modularized in `infra/modules/`. Avoid cloud-specific hardcoding in the application core.
+- **Core Orchestration:** n8n is used as the central engine for workflow automation and coordination (as per design doc).
+- **Agent Services:** AI Agents are exposed as discrete REST endpoints via FastAPI, allowing n8n to call them as part of the pipeline.
+- **State Management:** Strict use of `Pydantic` `BaseModel` (`AlertState`) for data exchange between n8n and agents.
 
 ## Coding Conventions
 - **Type Safety:** Mandatory type hints for all function signatures.

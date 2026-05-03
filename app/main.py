@@ -1,5 +1,8 @@
 from fastapi import FastAPI
-from app.workers.agent_worker import process_alert
+from app.agents.classifier_agent import classifier_agent
+from app.agents.decision_agent import decision_agent
+from app.agents.executor_agent import executor_agent
+from app.agents.state import AlertState
 from prometheus_client import make_asgi_app, Counter, Histogram
 import time
 
@@ -13,15 +16,20 @@ app = FastAPI()
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
-@app.post("/alert")
-async def handle_alert(payload: dict):
+@app.post("/agents/classifier")
+async def run_classifier(state: AlertState):
     start_time = time.time()
     try:
-        result = process_alert(payload)
-        ALERT_COUNT.labels(status="success").inc()
-        return {"status": "processed", "result": result}
-    except Exception as e:
-        ALERT_COUNT.labels(status="error").inc()
-        raise e
+        result = classifier_agent(state.dict())
+        ALERT_COUNT.labels(status="classifier_success").inc()
+        return result
     finally:
         PROCESSING_TIME.observe(time.time() - start_time)
+
+@app.post("/agents/decision")
+async def run_decision(state: AlertState):
+    return decision_agent(state.dict())
+
+@app.post("/agents/executor")
+async def run_executor(state: AlertState):
+    return executor_agent(state.dict())

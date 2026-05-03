@@ -1,0 +1,190 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/alert",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "id": "7f8f9f0f-1a2b-3c4d-5e6f-7g8h9i0j1k2l",
+      "webhookId": "alert-ingestion"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://app:8000/agents/classifier",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{$json[\"body\"][\"message\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Classifier Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        450,
+        300
+      ],
+      "id": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://app:8000/agents/decision",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "alert_type",
+              "value": "={{$json[\"alert_type\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Decision Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        650,
+        300
+      ],
+      "id": "2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"decision\"]}}",
+              "value2": "auto_remediate"
+            }
+          ]
+        }
+      },
+      "name": "Should Remediate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "id": "3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://app:8000/agents/executor",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "remediation_plan",
+              "value": "={{$json[\"remediation_plan\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Executor Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        200
+      ],
+      "id": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_CHAT_ID",
+        "text": "=Alert Processed: {{$json[\"message\"]}}\nDecision: {{$json[\"decision\"]}}"
+      },
+      "name": "Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ],
+      "id": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Classifier Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classifier Agent": {
+      "main": [
+        [
+          {
+            "node": "Decision Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision Agent": {
+      "main": [
+        [
+          {
+            "node": "Should Remediate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Remediate?": {
+      "main": [
+        [
+          {
+            "node": "Executor Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notification",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Executor Agent": {
+      "main": [
+        [
+          {
+            "node": "Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
