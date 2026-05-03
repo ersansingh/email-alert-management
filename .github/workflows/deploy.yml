@@ -1,0 +1,30 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud provider (aws or gcp)'
+        required: true
+        default: 'aws'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+    - name: Terraform Init
+      run: terraform -chdir=infra init
+    - name: Terraform Plan
+      run: terraform -chdir=infra plan -var="cloud_provider=${{ github.event.inputs.cloud_provider || 'aws' }}"
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main'
+      run: terraform -chdir=infra apply -auto-approve -var="cloud_provider=${{ github.event.inputs.cloud_provider || 'aws' }}"
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}

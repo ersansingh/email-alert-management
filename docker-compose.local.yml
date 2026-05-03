@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: ai-app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - localstack
+      - db
+      - mock-llm
+      - prometheus
+    volumes:
+      - .:/app
+    environment:
+      - ENV=test
+      - AWS_ENDPOINT=http://localstack:4566
+      - DB_HOST=db
+      - LLM_BASE_URL=http://mock-llm:5000
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+
+  localstack:
+    image: localstack/localstack
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs,lambda,dynamodb
+      - DEBUG=1
+    volumes:
+      - "./.localstack:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  db:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mock-llm:
+    image: python:3.10-slim
+    container_name: mock-llm
+    command: >
+      sh -c "pip install flask &&
+             python mock_llm.py"
+    volumes:
+      - ./tests/mock_llm.py:/mock_llm.py
+    ports:
+      - "5000:5000"
+
+volumes:
+  postgres_data:

@@ -1,15 +1,8 @@
 from langgraph.graph import StateGraph
+from app.agents.state import AlertState
+# ... other imports ...
 
-from app.agents.classifier_agent import classifier_agent
-from app.agents.retriever_agent import retriever_agent
-from app.agents.decision_agent import decision_agent
-from app.agents.planner_agent import planner_agent
-from app.agents.approval_agent import approval_agent
-from app.agents.executor_agent import executor_agent
-from app.agents.validator_agent import validator_agent
-from app.agents.learning_agent import learning_agent
-
-builder = StateGraph(dict)
+builder = StateGraph(AlertState)
 
 builder.add_node("classifier", classifier_agent)
 builder.add_node("retriever", retriever_agent)

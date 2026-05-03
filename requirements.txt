@@ -3,3 +3,13 @@ uvicorn
 langchain
 langgraph
 openai
+pydantic
+boto3
+pytest
+testcontainers[localstack]
+pytest-mock
+prometheus-client
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-exporter-otlp
