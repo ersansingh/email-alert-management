@@ -6,27 +6,53 @@ This system uses a multi-agent architecture with LangGraph to process and remedi
 
 1. Install requirements: `pip install -r requirements.txt`
 2. Run the application (using FastAPI): `uvicorn app.main:app --reload`
-3. Infrastructure deployment:
-   We use profile-based Terraform environments. Choose your target profile:
-   
-   - **For Local Testing (Docker + LocalStack):**
-     ```bash
-     cd infra/environments/awslocal
-     terraform init
-     terraform apply -auto-approve
-     ```
-   - **For AWS Production:**
-     ```bash
-     cd infra/environments/awsprod
-     terraform init
-     terraform apply
-     ```
-   - **For GCP Production:**
-     ```bash
-     cd infra/environments/gcpprod
-     terraform init
-     terraform apply
-     ```
+## Infrastructure Deployment
+
+We use profile-based Terraform environments. Choose your target profile:
+
+### 1. Prerequisites
+- **Terraform:** [Install Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli) (v1.0+)
+- **AWS CLI:** [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and configure with `aws configure`.
+- **Google Cloud SDK:** [Install gcloud CLI](https://cloud.google.com/sdk/docs/install) and run `gcloud auth application-default login`.
+- **kubectl:** [Install kubectl](https://kubernetes.io/docs/tasks/tools/) to interact with clusters.
+
+### 2. AWS Deployment (EKS)
+```bash
+cd infra/environments/awsprod
+terraform init
+terraform apply
+```
+- **Post-Deployment:** Update your kubeconfig:
+  `aws eks update-kubeconfig --region <region> --name ai-sre-cluster`
+
+### 3. GCP Deployment (GKE)
+```bash
+cd infra/environments/gcpprod
+terraform init
+terraform apply
+```
+- **Post-Deployment:** Update your kubeconfig:
+  `gcloud container clusters get-credentials ai-sre-cluster --region <region>`
+
+---
+
+## Deployment with Minimal Charges
+
+To minimize cloud costs during testing and development, follow these guidelines:
+
+### General Tips
+- **Clean Up:** Always run `terraform destroy` when you are finished testing to stop all billing.
+- **Region Selection:** Use regions with lower costs (e.g., `us-east-1` for AWS, `us-central1` for GCP).
+
+### AWS Cost Optimization
+- **Instance Types:** The default `t3.medium` is chosen for stability. For even lower costs, you can manually change `instance_types` to `t3.small` in `infra/modules/compute/aws/main.tf`, though performance may vary.
+- **Node Count:** The scaling config is set to `min_size = 1`. Ensure it stays at 1 for minimal cost.
+- **Cleanup:** EKS charges $0.10 per hour for the control plane. **Delete the cluster immediately after use.**
+
+### GCP Cost Optimization
+- **Preemptible Nodes:** The GCP setup is already configured to use **Preemptible VMs** (`preemptible = true`), which are up to 80% cheaper than standard VMs.
+- **GKE Free Tier:** Google Cloud offers a free tier for GKE that waives the cluster management fee for one zonal cluster per billing account.
+- **Machine Type:** Using `e2-medium` provides a good balance of cost and performance for small workloads.
 
 ---
 
