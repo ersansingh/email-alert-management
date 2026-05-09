@@ -1,6 +1,13 @@
 from langgraph.graph import StateGraph
 from app.agents.state import AlertState
-# ... other imports ...
+from app.agents.classifier_agent import classifier_agent
+from app.agents.retriever_agent import retriever_agent
+from app.agents.decision_agent import decision_agent
+from app.agents.planner_agent import planner_agent
+from app.agents.approval_agent import approval_agent
+from app.agents.executor_agent import executor_agent
+from app.agents.validator_agent import validator_agent
+from app.agents.learning_agent import learning_agent
 
 builder = StateGraph(AlertState)
 
@@ -20,7 +27,7 @@ builder.add_edge("retriever", "decision")
 
 builder.add_conditional_edges(
     "decision",
-    lambda x: "planner" if x["decision"] == "auto_remediate" else "learning"
+    lambda x: "planner" if getattr(x, "decision", None) == "auto_remediate" else "learning"
 )
 
 builder.add_edge("planner", "approval")

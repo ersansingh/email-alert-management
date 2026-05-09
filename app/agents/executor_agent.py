@@ -3,7 +3,7 @@ import subprocess
 def executor_agent(state):
     results = []
 
-    for step in state.get("remediation_plan", []):
+    for step in state.remediation_plan:
         try:
             cmd = step["action"]
             out = subprocess.run(cmd, shell=True, capture_output=True)
@@ -15,4 +15,4 @@ def executor_agent(state):
         except Exception as e:
             results.append({"error": str(e)})
 
-    return {**state, "execution_status": results}
+    return {"execution_status": str(results)}

@@ -5,25 +5,47 @@ on:
     branches: [ main ]
   workflow_dispatch:
     inputs:
-      cloud_provider:
-        description: 'Cloud provider (aws or gcp)'
+      environment:
+        description: 'Target environment (awsprod or gcpprod)'
         required: true
-        default: 'aws'
+        default: 'awsprod'
+        type: choice
+        options:
+          - awsprod
+          - gcpprod
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    
+    - name: Set Environment Variable
+      id: set-env
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "ENV_NAME=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+        else
+          # Default to awsprod for automated main branch pushes
+          echo "ENV_NAME=awsprod" >> $GITHUB_ENV
+        fi
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
+      
     - name: Terraform Init
-      run: terraform -chdir=infra init
+      run: terraform -chdir=infra/environments/${{ env.ENV_NAME }} init
+      
     - name: Terraform Plan
-      run: terraform -chdir=infra plan -var="cloud_provider=${{ github.event.inputs.cloud_provider || 'aws' }}"
+      run: terraform -chdir=infra/environments/${{ env.ENV_NAME }} plan
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        
     - name: Terraform Apply
-      if: github.ref == 'refs/heads/main'
-      run: terraform -chdir=infra apply -auto-approve -var="cloud_provider=${{ github.event.inputs.cloud_provider || 'aws' }}"
+      if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+      run: terraform -chdir=infra/environments/${{ env.ENV_NAME }} apply -auto-approve
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

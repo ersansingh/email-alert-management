@@ -77,3 +77,7 @@ resource "aws_eks_node_group" "default" {
     aws_iam_role_policy_attachment.node_policy_3
   ]
 }
+
+output "eks_cluster_name" {
+  value = aws_eks_cluster.main.name
+}

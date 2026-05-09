@@ -1,6 +1,22 @@
 version: "3.9"
 
 services:
+  terraform:
+    image: hashicorp/terraform:latest
+    container_name: terraform
+    volumes:
+      - ./infra:/infra
+    working_dir: /infra/environments/awslocal
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    entrypoint: /bin/sh -c "terraform init && terraform apply -auto-approve"
+    depends_on:
+      - localstack
+
   app:
     build: .
     container_name: ai-app
@@ -45,13 +61,13 @@ services:
       - "4318:4318"
 
   localstack:
-    image: localstack/localstack
+    image: localstack/localstack:3.0.2
     container_name: localstack
+    hostname: localstack
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=s3,sqs,lambda,dynamodb
-      - DEBUG=1
+      - DEBUG=0
     volumes:
       - "./.localstack:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"

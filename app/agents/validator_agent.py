@@ -1,2 +1,2 @@
 def validator_agent(state):
-    return {**state, "validation_status": "resolved"}
+    return {"validation_status": "resolved"}

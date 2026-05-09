@@ -7,11 +7,26 @@ This system uses a multi-agent architecture with LangGraph to process and remedi
 1. Install requirements: `pip install -r requirements.txt`
 2. Run the application (using FastAPI): `uvicorn app.main:app --reload`
 3. Infrastructure deployment:
-   ```bash
-   terraform init
-   terraform plan
-   terraform apply
-   ```
+   We use profile-based Terraform environments. Choose your target profile:
+   
+   - **For Local Testing (Docker + LocalStack):**
+     ```bash
+     cd infra/environments/awslocal
+     terraform init
+     terraform apply -auto-approve
+     ```
+   - **For AWS Production:**
+     ```bash
+     cd infra/environments/awsprod
+     terraform init
+     terraform apply
+     ```
+   - **For GCP Production:**
+     ```bash
+     cd infra/environments/gcpprod
+     terraform init
+     terraform apply
+     ```
 
 ---
 
@@ -58,9 +73,9 @@ Triggered on: **Push to any branch** and **Pull Requests**.
 
 ### 2. Continuous Deployment (CD) - `.github/workflows/deploy.yml`
 Triggered on: **Merge/Push to `main`**.
-- **Multi-Cloud Infrastructure:** Uses Terraform to provision resources.
-- **Provider Selection:** Supports both **AWS** and **GCP** via the `cloud_provider` variable.
-- **Manual Trigger:** Can be manually triggered via `workflow_dispatch` to choose a specific cloud provider.
+- **Multi-Cloud Infrastructure:** Uses Terraform environment profiles (`infra/environments/awsprod` or `infra/environments/gcpprod`) to provision resources.
+- **Provider Selection:** The pipeline dynamically targets the specific environment directory based on your deployment strategy.
+- **Manual Trigger:** Can be manually triggered via `workflow_dispatch` to choose a specific cloud environment.
 - **Security:** Injects `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `GOOGLE_CREDENTIALS` from GitHub Secrets.
 
 ---
