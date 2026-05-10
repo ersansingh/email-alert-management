@@ -1,0 +1,59 @@
+# .github/workflows/cd-azure.yml
+name: CD - Azure
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'release/azure'
+
+jobs:
+  deploy-to-azure:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: 'read'
+      id-token: 'write' # For OIDC
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Import Gemini API Key from Vault
+        id: vault-secrets
+        uses: hashicorp/vault-action@v3
+        with:
+          url: https://sample-cluster-public-vault-fb3bb75e.39d22881.z1.hashicorp.cloud:8200
+          role: azure-role
+          method: jwt
+          namespace: admin
+          secrets: |
+            secret/data/email-alert GEMINI_API_KEY | GEMINI_API_KEY;
+
+      - name: 'Az CLI login via OIDC'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Apply
+        id: apply
+        # NOTE: You will need to create a terraform environment for Azure
+        # working-directory: ./infra/environments/azureprod
+        run: |
+          echo "Azure Terraform directory not found. Please create one."
+          # terraform init
+          # terraform apply -auto-approve
+
+      - name: Deploy to AKS
+        run: |
+          # az aks get-credentials --resource-group <your-rg> --name <your-aks-cluster>
+          echo "Azure deployment steps need to be filled in."
+          # kubectl create secret generic gemini-api-key --from-literal=api-key=${{ steps.vault-secrets.outputs.GEMINI_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
+          # sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -
+

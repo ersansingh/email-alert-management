@@ -1,0 +1,38 @@
+# kubernetes/deployment-template.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-alert-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: email-alert
+  template:
+    metadata:
+      labels:
+        app: email-alert
+    spec:
+      containers:
+      - name: app
+        image: DOCKER_IMAGE_PLACEHOLDER
+        ports:
+        - containerPort: 8000
+        env:
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: gemini-api-key
+              key: api-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-alert-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: email-alert
+  ports:
+    - port: 80
+      targetPort: 8000

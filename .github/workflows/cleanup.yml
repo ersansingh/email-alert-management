@@ -1,0 +1,58 @@
+# .github/workflows/cleanup.yml
+name: Cleanup Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to clean up'
+        required: true
+        type: choice
+        options:
+        - awsprod
+        - gcpprod
+        - azureprod
+
+jobs:
+  destroy:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: 'write' # Required for OIDC
+      contents: 'read'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS Credentials via OIDC
+        if: ${{ github.event.inputs.environment == 'awsprod' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Configure GCP Credentials via OIDC
+        if: ${{ github.event.inputs.environment == 'gcpprod' }}
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/663314858590/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-deployer@ai-learning-495017.iam.gserviceaccount.com'
+
+      - name: Configure Azure Credentials via OIDC
+        if: ${{ github.event.inputs.environment == 'azureprod' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Destroy
+        working-directory: ./infra/environments/${{ github.event.inputs.environment }}
+        run: |
+          terraform init
+          terraform destroy -auto-approve

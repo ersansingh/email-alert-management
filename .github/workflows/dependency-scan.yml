@@ -1,0 +1,32 @@
+# .github/workflows/dependency-scan.yml
+name: Dependency Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '45 8 * * *' # Daily scan
+
+jobs:
+  pip-audit:
+    name: Scan Python Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install pip-audit
+          pip install -r requirements.txt
+      
+      - name: Run pip-audit
+        run: |
+          pip-audit

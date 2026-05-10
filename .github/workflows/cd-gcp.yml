@@ -1,0 +1,55 @@
+# .github/workflows/cd-gcp.yml
+name: CD - GCP
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'release/gcp'
+
+jobs:
+  deploy-to-gcp:
+    name: Deploy to GCP
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write' # For OIDC
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Import Gemini API Key from Vault
+        id: vault-secrets
+        uses: hashicorp/vault-action@v3
+        with:
+          url: https://sample-cluster-public-vault-fb3bb75e.39d22881.z1.hashicorp.cloud:8200
+          role: gcp-role # This role only needs access to the Gemini secret now
+          method: jwt
+          namespace: admin
+          secrets: |
+            secret/data/email-alert GEMINI_API_KEY | GEMINI_API_KEY;
+
+      - name: Authenticate to GCP via OIDC
+        id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/663314858590/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-deployer@ai-learning-495017.iam.gserviceaccount.com'
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Apply
+        id: apply
+        working-directory: ./infra/environments/gcpprod
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Deploy to GKE
+        run: |
+          gcloud container clusters get-credentials ai-sre-cluster --region us-central1
+          kubectl create secret generic gemini-api-key --from-literal=api-key=${{ steps.vault-secrets.outputs.GEMINI_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
+          sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -
+

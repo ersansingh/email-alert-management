@@ -8,34 +8,51 @@ This system uses a multi-agent architecture with LangGraph to process and remedi
 2. Run the application (using FastAPI): `uvicorn app.main:app --reload`
 ## Infrastructure Deployment
 
-We use profile-based Terraform environments. Choose your target profile:
+We use profile-based Terraform environments to deploy to various cloud providers.
 
-### 1. Prerequisites
-- **Terraform:** [Install Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli) (v1.0+)
-- **AWS CLI:** [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and configure with `aws configure`.
-- **Google Cloud SDK:** [Install gcloud CLI](https://cloud.google.com/sdk/docs/install) and run `gcloud auth application-default login`.
-- **kubectl:** [Install kubectl](https://kubernetes.io/docs/tasks/tools/) to interact with clusters.
+### 1. Authentication via OIDC (Recommended for CI/CD)
+For automated deployments via GitHub Actions, we leverage OpenID Connect (OIDC) to securely authenticate with cloud providers without storing long-lived credentials.
 
-### 2. AWS Deployment (EKS)
+*   **AWS:** Configure an [IAM OIDC Provider and an IAM Role](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html) that your GitHub repository can assume. The ARN of this role should be stored as a GitHub Secret: `AWS_OIDC_ROLE_ARN`.
+*   **GCP:** Refer to `docs/GCP_Deployment.md` for detailed instructions on setting up [Workload Identity Federation (OIDC)](https://cloud.google.com/iam/docs/workload-identity-federation-github) and linking your GitHub repository to a GCP Service Account. The required secrets (`GCP_PROJECT_ID`, `GCP_PROJECT_NUMBER`, `GCP_SERVICE_ACCOUNT`) are used in the OIDC configuration, not stored as direct credentials.
+*   **Azure:** Configure an [Azure AD App Registration and federated credential](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure?tabs=azure-portal%2Cwindows) that your GitHub repository can use. The Client ID, Tenant ID, and Subscription ID should be stored as GitHub Secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+
+### 2. Prerequisites (for Local Development/Manual Deployment)
+-   **Terraform:** [Install Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli) (v1.0+)
+-   **AWS CLI:** [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and configure with `aws configure`.
+-   **Google Cloud SDK (`gcloud`):** [Install gcloud CLI](https://cloud.google.com/sdk/docs/install) and authenticate locally with `gcloud auth login`.
+-   **Azure CLI:** [Install Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) and authenticate locally with `az login`.
+-   **kubectl:** [Install kubectl](https://kubernetes.io/docs/tasks/tools/) to interact with clusters.
+
+### 3. AWS Deployment (EKS)
 ```bash
 cd infra/environments/awsprod
 terraform init
 terraform apply
 ```
-- **Post-Deployment:** Update your kubeconfig:
-  `aws eks update-kubeconfig --region <region> --name ai-sre-cluster`
+-   **Post-Deployment:** Update your kubeconfig:
+    `aws eks update-kubeconfig --region <region> --name ai-sre-cluster`
 
-### 3. GCP Deployment (GKE)
+### 4. GCP Deployment (GKE)
 ```bash
 cd infra/environments/gcpprod
 terraform init
 terraform apply
 ```
-- **Post-Deployment:** Update your kubeconfig:
-  `gcloud container clusters get-credentials ai-sre-cluster --region <region>`
+-   **Post-Deployment:** Update your kubeconfig:
+    `gcloud container clusters get-credentials ai-sre-cluster --region <region>`
+
+### 5. Azure Deployment (AKS)
+*Note: You need to create `infra/environments/azureprod` directory and Terraform files.* 
+```bash
+cd infra/environments/azureprod
+terraform init
+terraform apply
+```
+-   **Post-Deployment:** Update your kubeconfig:
+    `az aks get-credentials --resource-group <your-rg> --name <your-aks-cluster>`
 
 ---
-
 ## Deployment with Minimal Charges
 
 To minimize cloud costs during testing and development, follow these guidelines:
@@ -97,12 +114,12 @@ Triggered on: **Push to any branch** and **Pull Requests**.
 - **Unit Testing:** Executes tests in `tests/` using `pytest` to ensure logic correctness.
 - **Verification:** Ensures the application can build and dependencies are resolved.
 
-### 2. Continuous Deployment (CD) - `.github/workflows/deploy.yml`
-Triggered on: **Merge/Push to `main`**.
-- **Multi-Cloud Infrastructure:** Uses Terraform environment profiles (`infra/environments/awsprod` or `infra/environments/gcpprod`) to provision resources.
-- **Provider Selection:** The pipeline dynamically targets the specific environment directory based on your deployment strategy.
-- **Manual Trigger:** Can be manually triggered via `workflow_dispatch` to choose a specific cloud environment.
-- **Security:** Injects `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `GOOGLE_CREDENTIALS` from GitHub Secrets.
+### 2. Continuous Deployment (CD) - `.github/workflows/cd-*.yml`
+Triggered on: **Merge/Push to `release/*` branches** or `workflow_dispatch`.
+-   **Multi-Cloud Infrastructure:** Uses Terraform environment profiles (`infra/environments/awsprod`, `gcpprod`, `azureprod`) to provision resources.
+-   **Authentication:** Leverages **GitHub OIDC** for secure, keyless authentication with AWS, GCP, and Azure. Cloud credentials are *not* stored as GitHub Secrets directly.
+-   **Application Secrets:** Application-specific secrets (e.g., `GEMINI_API_KEY`) are fetched at runtime from **HashiCorp Vault**.
+-   **Manual Trigger:** Can be manually triggered via `workflow_dispatch` to choose a specific cloud environment.
 
 ---
 
@@ -122,4 +139,4 @@ This section outlines the architectural standards and conventions.
 
 ## Development Workflows
 - **Branching:** Feature branches only. Merge to `main` only after CI success.
-- **Secrets:** Use GitHub Secrets for all sensitive keys. Never commit `.env` or secret files.
+-   **Secrets:** Cloud credentials are managed via **GitHub OIDC**. Application-specific secrets (e.g., `GEMINI_API_KEY`) are stored in **HashiCorp Vault** and fetched at runtime by CI/CD workflows. Never commit `.env` or secret files to the repository.
