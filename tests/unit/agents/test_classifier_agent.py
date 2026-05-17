@@ -1,6 +1,9 @@
 import pytest
 import os
 import importlib
+os.environ["LLM_BASE_URL"] = "http://mock-llm:5000"
+
+import pytest
 from unittest.mock import patch, MagicMock
 from app.agents.state import AlertState
 import app.agents.classifier_agent as classifier_module

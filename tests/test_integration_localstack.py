@@ -5,7 +5,7 @@ from app.agents.state import AlertState
 
 @pytest.fixture(scope="module")
 def localstack():
-    with LocalStackContainer(image="localstack/localstack:latest") as localstack:
+    with LocalStackContainer(image="localstack/localstack:3.0.2") as localstack:
         yield localstack
 
 @pytest.fixture
