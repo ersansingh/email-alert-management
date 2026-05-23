@@ -7,35 +7,44 @@ on:
     branches:
       - 'release/gcp'
 
+env:
+  PROJECT_ID: ai-learning-495017
+  PROJECT_NUMBER: '663314858590'
+  REGION: us-central1
+  REPOSITORY: ai-sre-repo
+  IMAGE_NAME: email-alert-app
+
 jobs:
   deploy-to-gcp:
     name: Deploy to GCP
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
-      id-token: 'write' # For OIDC
+      id-token: 'write' # Required for OIDC
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Import Gemini API Key from Vault
-        id: vault-secrets
-        uses: hashicorp/vault-action@v3
-        with:
-          url: https://sample-cluster-public-vault-fb3bb75e.39d22881.z1.hashicorp.cloud:8200
-          role: gcp-role # This role only needs access to the Gemini secret now
-          method: jwt
-          namespace: admin
-          secrets: |
-            secret/data/email-alert GEMINI_API_KEY | GEMINI_API_KEY;
-
       - name: Authenticate to GCP via OIDC
         id: 'auth'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/663314858590/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-          service_account: 'github-actions-deployer@ai-learning-495017.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GAR
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -45,11 +54,10 @@ jobs:
         working-directory: ./infra/environments/gcpprod
         run: |
           terraform init
-          terraform apply -auto-approve
+          terraform apply -auto-approve -var="project_id=${{ env.PROJECT_ID }}" -var="region=${{ env.REGION }}"
 
       - name: Deploy to GKE
         run: |
-          gcloud container clusters get-credentials ai-sre-cluster --region us-central1
-          kubectl create secret generic gemini-api-key --from-literal=api-key=${{ steps.vault-secrets.outputs.GEMINI_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
-          sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -
-
+          gcloud container clusters get-credentials ai-sre-cluster --region ${{ env.REGION }}
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          sed -e "s|DOCKER_IMAGE_PLACEHOLDER|$IMAGE_TAG|g" kubernetes/deployment-template.yaml | kubectl apply -f -

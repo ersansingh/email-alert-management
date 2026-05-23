@@ -15,15 +15,9 @@ spec:
     spec:
       containers:
       - name: app
-        image: DOCKER_IMAGE_PLACEHOLDER
+        image: us-central1-docker.pkg.dev/ai-learning-495017/ai-sre-repo/email-alert-app:latest
         ports:
         - containerPort: 8000
-        env:
-        - name: GEMINI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: gemini-api-key
-              key: api-key
 ---
 apiVersion: v1
 kind: Service

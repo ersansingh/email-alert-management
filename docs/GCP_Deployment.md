@@ -113,24 +113,28 @@ gcloud container clusters get-credentials ai-sre-cluster --region us-central1
 *(Make sure to match the region to what was outputted by Terraform, usually `us-central1` by default).*
 
 ### Step 5: Build and Push the Docker Image
-To run your FastAPI app on Kubernetes, Google Cloud needs access to your Docker image. For CI/CD, images are pushed to Docker Hub by the CI workflow and pulled from there. For local testing or direct pushes, you can use Artifact Registry:
+To run your FastAPI app on Kubernetes, Google Cloud needs access to your Docker image. 
 
-1.  **Create an Artifact Registry Repository (like ECR):**
-    ```bash
-    gcloud artifacts repositories create ai-sre-repo --repository-format=docker --location=us-central1
-    ```
-2.  **Authenticate Docker with Artifact Registry:**
-    ```bash
-    gcloud auth configure-docker us-central1-docker.pkg.dev
-    ```
-3.  **Build the Image (from project root):**
-    ```bash
-    docker build -t us-central1-docker.pkg.dev/ai-learning-495017/ai-sre-repo/email-alert-app:latest .
-    ```
-4.  **Push the Image:**
-    ```bash
-    docker push us-central1-docker.pkg.dev/ai-learning-495017/ai-sre-repo/email-alert-app:latest
-    ```
+1.  **Artifact Registry Repository:**
+    The Artifact Registry repository (`ai-sre-repo`) is managed by Terraform in `infra/modules/storage/gcp/main.tf`. It is automatically created when you run `terraform apply`.
+
+2.  **CI/CD Pipeline (Recommended):**
+    The `.github/workflows/cd-gcp.yml` pipeline is configured to automatically build and push the Docker image to Artifact Registry using OIDC authentication. It then deploys the updated image to the GKE cluster.
+
+3.  **Manual Push (Optional/Testing):**
+    If you need to push an image manually:
+    *   **Authenticate Docker with Artifact Registry:**
+        ```bash
+        gcloud auth configure-docker us-central1-docker.pkg.dev
+        ```
+    *   **Build the Image (from project root):**
+        ```bash
+        docker build -t us-central1-docker.pkg.dev/ai-learning-495017/ai-sre-repo/email-alert-app:latest .
+        ```
+    *   **Push the Image:**
+        ```bash
+        docker push us-central1-docker.pkg.dev/ai-learning-495017/ai-sre-repo/email-alert-app:latest
+        ```
 
 ### Step 6: Deploy the Application to GKE (Manual / Local Test)
 For CI/CD, the `cd-gcp.yml` workflow handles this. For manual deployment or testing after local image push:

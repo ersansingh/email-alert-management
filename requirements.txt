@@ -2,6 +2,7 @@ fastapi
 uvicorn
 langchain
 langchain-openai
+langchain-google-vertexai
 langchain-google-genai
 langgraph
 openai
