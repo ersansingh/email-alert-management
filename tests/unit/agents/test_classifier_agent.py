@@ -1,12 +1,13 @@
 import pytest
 import os
 import importlib
-os.environ["LLM_BASE_URL"] = "http://mock-llm:5000"
-
-import pytest
 from unittest.mock import patch, MagicMock
 from app.agents.state import AlertState
 import app.agents.classifier_agent as classifier_module
+
+# Set dummy environment variables before any tests run
+os.environ["LLM_BASE_URL"] = "http://mock-llm:5000"
+os.environ["OPENROUTER_API_KEY"] = "mock_key"
 
 @patch("app.agents.classifier_agent.ChatOpenAI.invoke")
 def test_classifier_agent(mock_invoke):
@@ -25,5 +26,3 @@ def test_classifier_agent_base_url_append_v1():
     # Reload the module to trigger the LLM_BASE_URL logic
     importlib.reload(classifier_module)
     assert classifier_module.llm_base_url == "http://mock-llm:5000/v1"
-
-
