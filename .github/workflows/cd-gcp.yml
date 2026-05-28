@@ -8,8 +8,32 @@ on:
       - 'release/gcp'
 
 jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: dedoc22/email-alert-app:${{ github.sha }}
+
   deploy-to-gcp:
     name: Deploy to GCP
+    needs: build-and-push
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
@@ -18,17 +42,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Import Gemini API Key from Vault
-        id: vault-secrets
-        uses: hashicorp/vault-action@v3
-        with:
-          url: https://sample-cluster-public-vault-fb3bb75e.39d22881.z1.hashicorp.cloud:8200
-          role: gcp-role # This role only needs access to the Gemini secret now
-          method: jwt
-          namespace: admin
-          secrets: |
-            secret/data/email-alert GEMINI_API_KEY | GEMINI_API_KEY;
 
       - name: Authenticate to GCP via OIDC
         id: 'auth'
@@ -50,6 +63,5 @@ jobs:
       - name: Deploy to GKE
         run: |
           gcloud container clusters get-credentials ai-sre-cluster --region us-central1
-          kubectl create secret generic gemini-api-key --from-literal=api-key=${{ steps.vault-secrets.outputs.GEMINI_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic openrouter-api-key --from-literal=api-key=${{ secrets.OPENROUTER_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
           sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -
-

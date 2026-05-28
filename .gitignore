@@ -1,5 +1,6 @@
 .idea
 .bead
+.env
 
 # Python
 __pycache__/

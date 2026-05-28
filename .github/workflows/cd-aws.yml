@@ -8,8 +8,32 @@ on:
       - 'release/aws'
 
 jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: dedoc22/email-alert-app:${{ github.sha }}
+
   deploy-to-aws:
     name: Deploy to AWS
+    needs: build-and-push
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
@@ -18,17 +42,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Import Gemini API Key from Vault
-        id: vault-secrets
-        uses: hashicorp/vault-action@v3
-        with:
-          url: https://sample-cluster-public-vault-fb3bb75e.39d22881.z1.hashicorp.cloud:8200
-          role: aws-role 
-          method: jwt
-          namespace: admin
-          secrets: |
-            secret/data/email-alert GEMINI_API_KEY | GEMINI_API_KEY;
 
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -49,9 +62,5 @@ jobs:
       - name: Deploy to EKS
         run: |
           aws eks update-kubeconfig --region us-east-1 --name ai-sre-cluster
-          # Create a generic k8s secret for the API key
-          kubectl create secret generic gemini-api-key --from-literal=api-key=${{ steps.vault-secrets.outputs.GEMINI_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
-          # You would typically use a templating tool like Helm or Kustomize here
-          # For simplicity, we use sed to replace placeholders in a template
+          kubectl create secret generic openrouter-api-key --from-literal=api-key=${{ secrets.OPENROUTER_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
           sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -
-
