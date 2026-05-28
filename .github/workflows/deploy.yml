@@ -17,6 +17,9 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
     - uses: actions/checkout@v3
     
@@ -31,22 +34,29 @@ jobs:
         fi
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v3
       
+    - name: Authenticate to AWS via OIDC
+      if: env.ENV_NAME == 'awsprod'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+        aws-region: us-east-1
+
+    - name: Authenticate to GCP via OIDC
+      if: env.ENV_NAME == 'gcpprod'
+      id: 'auth'
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: 'projects/663314858590/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+        service_account: 'github-actions-deployer@ai-learning-495017.iam.gserviceaccount.com'
+
     - name: Terraform Init
       run: terraform -chdir=infra/environments/${{ env.ENV_NAME }} init
       
     - name: Terraform Plan
       run: terraform -chdir=infra/environments/${{ env.ENV_NAME }} plan
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
       run: terraform -chdir=infra/environments/${{ env.ENV_NAME }} apply -auto-approve
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
