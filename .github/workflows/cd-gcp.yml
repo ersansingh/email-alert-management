@@ -63,6 +63,6 @@ jobs:
 
       - name: Deploy to GKE
         run: |
-          gcloud container clusters get-credentials ai-sre-cluster --region us-central1
+          gcloud container clusters get-credentials ai-sre-cluster --zone us-central1-a
           kubectl create secret generic openrouter-api-key --from-literal=api-key=${{ secrets.OPENROUTER_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
           sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -

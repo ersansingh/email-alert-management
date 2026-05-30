@@ -5,4 +5,5 @@ resource "google_pubsub_topic" "alerts" {
 resource "google_storage_bucket" "alerts" {
   name     = "ai-sre-alert-archive-${var.region}"
   location = var.region
+  uniform_bucket_level_access = true
 }
