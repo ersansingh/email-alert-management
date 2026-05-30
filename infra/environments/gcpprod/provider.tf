@@ -5,6 +5,10 @@ terraform {
       version = "~> 5.0"
     }
   }
+  backend "gcs" {
+    bucket  = "terraform-state-ai-learning-495017"
+    prefix  = "terraform/state"
+  }
 }
 
 provider "google" {
