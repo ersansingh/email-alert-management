@@ -17,6 +17,7 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    if: github.actor == github.repository_owner
     permissions:
       id-token: write
       contents: read

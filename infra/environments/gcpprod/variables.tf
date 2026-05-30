@@ -7,5 +7,5 @@ variable "region" {
 variable "project_id" {
   description = "GCP Project ID"
   type        = string
-  default     = "ai-sre-project"
+  default     = "ai-learning-495017"
 }

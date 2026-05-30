@@ -18,6 +18,7 @@ jobs:
   apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
+    if: github.actor == github.repository_owner
 
     permissions:
       id-token: 'write' # Required for OIDC

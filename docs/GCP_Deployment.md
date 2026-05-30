@@ -18,7 +18,7 @@ Before deploying, you need to set up your Google Cloud environment and configure
 
 1.  **Create a GCP Project:**
     *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
-    *   Click the project dropdown at the top left and select **New Project**. Name it `ai-sre-project` (or your chosen project ID: `ai-learning-495017`).
+    *   Click the project dropdown at the top left and select **New Project**. Name it `ai-learning-495017` (or your chosen project ID: `ai-learning-495017`).
 2.  **Enable Billing:**
     *   Go to **Billing** in the left menu and link your project to a billing account.
 3.  **Enable Required APIs:**

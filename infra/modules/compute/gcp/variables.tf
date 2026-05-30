@@ -24,5 +24,5 @@ variable "subnet_name" {
 
 variable "project_id" {
   type = string
-  default = "ai-sre-project"
+  default = "ai-learning-495017"
 }

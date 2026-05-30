@@ -11,6 +11,7 @@ jobs:
   build-and-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    if: github.actor == github.repository_owner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
