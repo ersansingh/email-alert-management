@@ -3,14 +3,27 @@ name: Integration Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'gcpprod'
+        type: choice
+        options:
+          - gcpprod
+          - awsprod
   push:
     branches:
       - main
 
 jobs:
-  localstack-tests:
-    name: Run LocalStack Integration Tests
+  run-tests:
+    name: Run Integration Tests
     runs-on: ubuntu-latest
+    if: github.actor == github.repository_owner
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,14 +36,146 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pytest testcontainers[localstack]
-          
-      - name: Start services
-        run: docker-compose -f docker-compose.local.yml up -d --build
+          pip install pytest google-cloud-storage google-cloud-pubsub boto3
+      
+      - name: Set Environment Variables
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "ENV_NAME=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          else
+            echo "ENV_NAME=gcpprod" >> $GITHUB_ENV
+          fi
 
-      - name: Wait for services to be healthy
-        # In a real scenario, you might use a more robust health check
-        run: sleep 30 
+      - name: Authenticate to AWS
+        if: env.ENV_NAME == 'awsprod'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Authenticate to GCP
+        if: env.ENV_NAME == 'gcpprod'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/663314858590/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-deployer@ai-learning-495017.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        if: env.ENV_NAME == 'gcpprod'
+        uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          install_components: 'gke-gcloud-auth-plugin'
 
       - name: Run integration tests
-        run: pytest tests/test_integration_localstack.py
+        run: pytest tests/integration/
+
+      - name: Deploy to GKE
+        if: env.ENV_NAME == 'gcpprod'
+        run: |
+          gcloud container clusters get-credentials ai-sre-cluster --zone us-central1-a
+          # Ensure secret exists
+          kubectl create secret generic openrouter-api-key --from-literal=api-key=${{ secrets.OPENROUTER_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
+          # Deploy app if missing or to ensure latest manifest
+          sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -
+          if ! kubectl rollout status deployment/email-alert-app --timeout=120s; then
+            echo "Deployment failed! Printing debug info..."
+            kubectl get pods
+            kubectl describe pods
+            kubectl logs -l app=email-alert --tail=50
+            exit 1
+          fi
+
+      - name: Get GKE LoadBalancer IP
+        if: env.ENV_NAME == 'gcpprod'
+        run: |
+          gcloud container clusters get-credentials ai-sre-cluster --zone us-central1-a
+          # Wait for LB IP or Hostname (max 5 minutes)
+          for i in {1..30}; do
+            IP=$(kubectl get svc email-alert-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [ -n "$IP" ]; then
+              echo "BASE_URL=http://$IP" >> $GITHUB_ENV
+              URL="http://$IP"
+              echo "Found IP: $IP"
+              break
+            fi
+            HOSTNAME=$(kubectl get svc email-alert-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -n "$HOSTNAME" ]; then
+              echo "BASE_URL=http://$HOSTNAME" >> $GITHUB_ENV
+              URL="http://$HOSTNAME"
+              echo "Found Hostname: $HOSTNAME"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Timed out waiting for LoadBalancer IP/Hostname"
+              exit 1
+            fi
+            echo "Waiting for LoadBalancer IP/Hostname... ($i/30)"
+            sleep 10
+          done
+          
+          # Wait for service to be reachable (max 10 minutes)
+          echo "Waiting for $URL/metrics to be reachable..."
+          for i in {1..60}; do
+            if curl -s -f -o /dev/null "$URL/metrics"; then
+              echo "Service is reachable!"
+              exit 0
+            fi
+            echo "Service not reachable yet... ($i/60)"
+            sleep 10
+          done
+          echo "Timed out waiting for service reachability"
+          exit 1
+
+      - name: Deploy to EKS
+        if: env.ENV_NAME == 'awsprod'
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name ai-sre-cluster
+          # Ensure secret exists
+          kubectl create secret generic openrouter-api-key --from-literal=api-key=${{ secrets.OPENROUTER_API_KEY }} --dry-run=client -o yaml | kubectl apply -f -
+          # Deploy app if missing
+          sed -e "s|DOCKER_IMAGE_PLACEHOLDER|dedoc22/email-alert-app:${{ github.sha }}|g" kubernetes/deployment-template.yaml | kubectl apply -f -
+          kubectl rollout status deployment/email-alert-app --timeout=120s
+
+      - name: Get EKS LoadBalancer IP
+        if: env.ENV_NAME == 'awsprod'
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name ai-sre-cluster
+          # Wait for LB IP or Hostname (max 5 minutes)
+          for i in {1..30}; do
+            IP=$(kubectl get svc email-alert-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [ -n "$IP" ]; then
+              echo "BASE_URL=http://$IP" >> $GITHUB_ENV
+              URL="http://$IP"
+              echo "Found IP: $IP"
+              break
+            fi
+            HOSTNAME=$(kubectl get svc email-alert-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -n "$HOSTNAME" ]; then
+              echo "BASE_URL=http://$HOSTNAME" >> $GITHUB_ENV
+              URL="http://$HOSTNAME"
+              echo "Found Hostname: $HOSTNAME"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Timed out waiting for LoadBalancer IP/Hostname"
+              exit 1
+            fi
+            echo "Waiting for LoadBalancer IP/Hostname... ($i/30)"
+            sleep 10
+          done
+
+          # Wait for service to be reachable (max 10 minutes)
+          echo "Waiting for $URL/metrics to be reachable..."
+          for i in {1..60}; do
+            if curl -s -f -o /dev/null "$URL/metrics"; then
+              echo "Service is reachable!"
+              exit 0
+            fi
+            echo "Service not reachable yet... ($i/60)"
+            sleep 10
+          done
+          echo "Timed out waiting for service reachability"
+          exit 1
+
+      - name: Run functional tests
+        run: pytest tests/test_functional.py

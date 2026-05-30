@@ -30,7 +30,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: dedoc22/email-alert-app:${{ github.sha }}
+          tags: |
+            dedoc22/email-alert-app:${{ github.sha }}
+            dedoc22/email-alert-app:latest
 
   deploy-to-aws:
     name: Deploy to AWS

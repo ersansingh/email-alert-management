@@ -30,7 +30,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: dedoc22/email-alert-app:${{ github.sha }}
+          tags: |
+            dedoc22/email-alert-app:${{ github.sha }}
+            dedoc22/email-alert-app:latest
 
   deploy-to-gcp:
     name: Deploy to GCP
@@ -50,6 +52,11 @@ jobs:
         with:
           workload_identity_provider: 'projects/663314858590/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'github-actions-deployer@ai-learning-495017.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          install_components: 'gke-gcloud-auth-plugin'
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3

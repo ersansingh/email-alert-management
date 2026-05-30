@@ -99,7 +99,8 @@ Once running, you can access the following services:
 ### 4. Running Integration Tests
 To run tests against the LocalStack instance programmatically:
 ```bash
-pytest tests/test_integration_localstack.py
+# Run the local-only integration test script (Requires Docker Desktop)
+python scripts/test_local.py
 ```
 
 ---
@@ -111,10 +112,15 @@ The project uses GitHub Actions to automate the entire lifecycle from code commi
 ### 1. Continuous Integration (CI) - `.github/workflows/ci.yml`
 Triggered on: **Push to any branch** and **Pull Requests**.
 - **Linting:** Checks code style using `flake8`.
-- **Unit Testing:** Executes tests in `tests/` using `pytest` to ensure logic correctness.
-- **Verification:** Ensures the application can build and dependencies are resolved.
+- **Unit Testing:** Executes tests in `tests/` using `pytest`.
 
-### 2. Continuous Deployment (CD) - `.github/workflows/cd-*.yml`
+### 2. Integration Testing - `.github/workflows/integration-tests.yml`
+Triggered on: **Push to `main`** or `workflow_dispatch`.
+- **Default Environment:** `gcpprod`.
+- **Purpose:** Validates that provisioned infrastructure (GCS, Pub/Sub, S3, SQS) is accessible and correctly configured.
+- **Local Testing:** Local integration testing (using LocalStack) is handled via **Docker Desktop** on the developer's machine (see "Local Testing" section below).
+
+### 3. Continuous Deployment (CD) - `.github/workflows/cd-*.yml`
 Triggered on: **Merge/Push to `release/*` branches** or `workflow_dispatch`.
 -   **Multi-Cloud Infrastructure:** Uses Terraform environment profiles (`infra/environments/awsprod`, `gcpprod`, `azureprod`) to provision resources.
 -   **Authentication:** Leverages **GitHub OIDC** for secure, keyless authentication with AWS, GCP, and Azure. Cloud credentials are *not* stored as GitHub Secrets directly.
