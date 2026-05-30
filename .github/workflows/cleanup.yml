@@ -7,10 +7,11 @@ on:
       environment:
         description: 'Environment to clean up'
         required: true
+        default: 'gcpprod'
         type: choice
         options:
-        - awsprod
         - gcpprod
+        - awsprod
         - azureprod
 
 jobs:

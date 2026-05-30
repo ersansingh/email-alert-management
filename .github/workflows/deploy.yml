@@ -8,7 +8,7 @@ on:
       environment:
         description: 'Target environment (awsprod or gcpprod)'
         required: true
-        default: 'awsprod'
+        default: 'gcpprod'
         type: choice
         options:
           - awsprod
@@ -29,8 +29,8 @@ jobs:
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           echo "ENV_NAME=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
         else
-          # Default to awsprod for automated main branch pushes
-          echo "ENV_NAME=awsprod" >> $GITHUB_ENV
+          # Default to gcpprod for automated main branch pushes
+          echo "ENV_NAME=gcpprod" >> $GITHUB_ENV
         fi
 
     - name: Setup Terraform
