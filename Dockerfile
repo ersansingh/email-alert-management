@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install dependencies into a separate directory to facilitate multi-stage builds
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt --upgrade
 
 
 # Final stage: build the production image

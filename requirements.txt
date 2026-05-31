@@ -15,3 +15,5 @@ opentelemetry-api
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
 opentelemetry-exporter-otlp
+jaraco.context==6.1.0
+wheel==0.46.2
